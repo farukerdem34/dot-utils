@@ -1,59 +1,100 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, KeyCode, KeyEvent, KeyModifiers},
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
-    widgets::{Block, Borders, Paragraph},
+    layout::{Constraint, Direction, Layout},
+    widgets::{Block, Borders, List, ListItem},
+    Terminal,
 };
-use std::io;
+use std::{io, thread, time::Duration};
 
-fn main() -> Result<(), io::Error> {
+fn main() -> io::Result<()> {
     // Setup terminal
-    enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen)?;
+    terminal::enable_raw_mode()?;
+
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // App loop
-    let res = run_app(&mut terminal);
+    let menu_items = vec!["Say Hello", "Print Time", "Exit"];
+    let mut selected = 0;
 
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{:?}", err);
-    }
-
-    Ok(())
-}
-
-fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
             let size = f.size();
-            let block = Block::default().title("My TUI App").borders(Borders::ALL);
-            let text =
-                Paragraph::new("Press 'q' to quit.").block(Block::default().borders(Borders::ALL));
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![Constraint::Percentage(100)])
+                .split(size);
 
-            f.render_widget(block, size);
-            f.render_widget(text, size);
+            let items: Vec<ListItem> = menu_items
+                .iter()
+                .enumerate()
+                .map(|(i, &item)| {
+                    let content = if i == selected {
+                        format!("> {}", item) // Highlight selected item
+                    } else {
+                        format!("  {}", item)
+                    };
+                    ListItem::new(content)
+                })
+                .collect();
+
+            let list = List::new(items).block(Block::default().title("Menu").borders(Borders::ALL));
+
+            f.render_widget(list, chunks[0]);
         })?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.code == KeyCode::Char('q') {
-                return Ok(());
+        // Handle input
+        if event::poll(Duration::from_millis(100))? {
+            if let event::Event::Key(KeyEvent {
+                code, modifiers, ..
+            }) = event::read()?
+            {
+                match code {
+                    KeyCode::Up => {
+                        if selected > 0 {
+                            selected -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        if selected < menu_items.len() - 1 {
+                            selected += 1;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        match selected {
+                            0 => say_hello(),
+                            1 => print_time(),
+                            2 => break, // Exit app
+                            _ => {}
+                        }
+                    }
+                    KeyCode::Char('q') | KeyCode::Esc => break, // Quit app
+                    _ => {}
+                }
             }
         }
     }
+
+    // Cleanup terminal
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal::disable_raw_mode()?;
+    Ok(())
 }
 
+// Functions executed by menu items
+fn say_hello() {
+    println!("Hello, World!");
+    thread::sleep(Duration::from_secs(1));
+}
+
+fn print_time() {
+    let now = chrono::Local::now();
+    println!("Current Time: {}", now.format("%Y-%m-%d %H:%M:%S"));
+    thread::sleep(Duration::from_secs(1));
+}
