@@ -1,75 +1,128 @@
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Terminal,
 };
-use std::{io, thread, time::Duration};
+use std::io;
+
+// Define our menu options
+enum MenuItem {
+    Option1,
+    Option2,
+    Option3,
+    Quit,
+}
 
 struct App {
-    menu_items: Vec<(&'static str, fn() -> String)>,
     menu_state: usize,
+    menu_items: Vec<(&'static str, MenuItem)>,
     output: String,
 }
 
 impl App {
     fn new() -> Self {
         Self {
-            menu_items: vec![
-                ("Say Hello", say_hello),
-                ("Print Time", print_time),
-                ("Exit", || "Exiting...".to_string()),
-            ],
             menu_state: 0,
-            output: "Select an option and press Enter.".to_string(),
+            menu_items: vec![
+                ("Option 1", MenuItem::Option1),
+                ("Option 2", MenuItem::Option2),
+                ("Option 3", MenuItem::Option3),
+                ("Quit", MenuItem::Quit),
+            ],
+            output: String::from("Welcome! Select an option and press Enter to execute."),
         }
     }
 
     fn next(&mut self) {
-        if self.menu_state < self.menu_items.len() - 1 {
-            self.menu_state += 1;
-        }
+        self.menu_state = (self.menu_state + 1) % self.menu_items.len();
     }
 
     fn previous(&mut self) {
         if self.menu_state > 0 {
             self.menu_state -= 1;
+        } else {
+            self.menu_state = self.menu_items.len() - 1;
         }
     }
 
     fn execute_current(&mut self) {
-        self.output = (self.menu_items[self.menu_state].1)();
+        match self.menu_items[self.menu_state].1 {
+            MenuItem::Option1 => self.function_one(),
+            MenuItem::Option2 => self.function_two(),
+            MenuItem::Option3 => self.function_three(),
+            MenuItem::Quit => {} // Handled in main loop
+        }
+    }
+
+    fn function_one(&mut self) {
+        self.output = String::from("Function One executed!");
+    }
+
+    fn function_two(&mut self) {
+        self.output = String::from("Function Two executed!");
+    }
+
+    fn function_three(&mut self) {
+        self.output = String::from("Function Three executed!");
     }
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Result<(), io::Error> {
+    // Setup terminal
+    enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    terminal::enable_raw_mode()?;
-
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new();
+    // Create app and run it
+    let app = App::new();
+    let res = run_app(&mut terminal, app);
 
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        println!("{:?}", err);
+    }
+
+    Ok(())
+}
+
+fn run_app<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    mut app: App,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
+            // Split the screen into two sections
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints([
-                    Constraint::Length(6), // Menü
-                    Constraint::Min(1),    // Çıktı alanı
-                ])
+                .constraints(
+                    [
+                        Constraint::Length(6), // Menu
+                        Constraint::Min(1),    // Output area
+                    ]
+                    .as_ref(),
+                )
                 .split(f.size());
 
+            // Create menu items
             let items: Vec<ListItem> = app
                 .menu_items
                 .iter()
@@ -81,11 +134,13 @@ fn main() -> io::Result<()> {
                         Style::default().fg(Color::White)
                     };
 
+                    // Using Line instead of Spans
                     let content = Line::from(vec![Span::styled(name.to_string(), style)]);
                     ListItem::new(content)
                 })
                 .collect();
 
+            // Create menu widget
             let menu = List::new(items)
                 .block(Block::default().title("Menu").borders(Borders::ALL))
                 .highlight_style(
@@ -95,6 +150,7 @@ fn main() -> io::Result<()> {
                         .add_modifier(Modifier::BOLD),
                 );
 
+            // Create output widget
             let output = Paragraph::new(Line::from(app.output.as_str()));
             f.render_widget(menu, chunks[0]);
             f.render_widget(output, chunks[1]);
@@ -102,12 +158,12 @@ fn main() -> io::Result<()> {
 
         if let Event::Key(key) = event::read()? {
             match key.code {
-                KeyCode::Char('q') => break,
+                KeyCode::Char('q') => return Ok(()),
                 KeyCode::Down | KeyCode::Char('j') => app.next(),
                 KeyCode::Up | KeyCode::Char('k') => app.previous(),
                 KeyCode::Enter => {
-                    if app.menu_state == app.menu_items.len() - 1 {
-                        break; // Exit seçildiyse çık
+                    if let MenuItem::Quit = app.menu_items[app.menu_state].1 {
+                        return Ok(());
                     }
                     app.execute_current();
                 }
@@ -115,18 +171,4 @@ fn main() -> io::Result<()> {
             }
         }
     }
-
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal::disable_raw_mode()?;
-    Ok(())
-}
-
-// Menüde çalıştırılacak fonksiyonlar
-fn say_hello() -> String {
-    "Hello, World!".to_string()
-}
-
-fn print_time() -> String {
-    let now = chrono::Local::now();
-    format!("Current Time: {}", now.format("%Y-%m-%d %H:%M:%S"))
 }
