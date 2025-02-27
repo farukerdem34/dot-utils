@@ -1,3 +1,4 @@
+use chrono::{format, prelude};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -12,10 +13,10 @@ use ratatui::{
     Terminal,
 };
 use std::io;
-
+use std::process::Command;
 // Define our menu options
 enum MenuItem {
-    Option1,
+    UpdatePackages,
     Option2,
     Option3,
     Quit,
@@ -32,7 +33,7 @@ impl App {
         Self {
             menu_state: 0,
             menu_items: vec![
-                ("Option 1", MenuItem::Option1),
+                ("Update Packages", MenuItem::UpdatePackages),
                 ("Option 2", MenuItem::Option2),
                 ("Option 3", MenuItem::Option3),
                 ("Quit", MenuItem::Quit),
@@ -55,15 +56,62 @@ impl App {
 
     fn execute_current(&mut self) {
         match self.menu_items[self.menu_state].1 {
-            MenuItem::Option1 => self.function_one(),
+            MenuItem::UpdatePackages => self.update_pkgs(),
             MenuItem::Option2 => self.function_two(),
             MenuItem::Option3 => self.function_three(),
             MenuItem::Quit => {} // Handled in main loop
         }
     }
+    fn get_package_manager(&mut self) -> String {
+        let mut package_manager = String::new();
 
-    fn function_one(&mut self) {
-        self.output = String::from("Function One executed!");
+        let apt_check = Command::new("dpkg").arg("--version").output();
+        let pacman_check = Command::new("pacman").arg("--version").output();
+        let yay_check = Command::new("yay").arg("--version").output();
+        match apt_check {
+            Ok(output) if output.status.success() => package_manager = String::from("apt"),
+            _ => match yay_check {
+                Ok(output) if output.status.success() => package_manager = String::from("yay"),
+                _ => match pacman_check {
+                    Ok(output) if output.status.success() => {
+                        package_manager = String::from("pacman")
+                    }
+                    _ => {
+                        panic!("No valid package manager found!");
+                    }
+                },
+            },
+        }
+        package_manager
+    }
+
+    fn update_pkgs(&mut self) {
+        let package_manager = self.get_package_manager();
+        let mut output;
+        match package_manager.as_str() {
+            // as_str() ile &str formatına çeviriyoruz
+            "apt" => {
+                output = Command::new("sudo")
+                    .arg("apt")
+                    .arg("update")
+                    .arg("-y")
+                    .output();
+            }
+            "yay" => {
+                output = Command::new("yay").arg("-Sy").output();
+            }
+            "pacman" => {
+                output = Command::new("sudo").arg("pacman").arg("-Sy").output();
+            }
+            _ => panic!("error occurred"),
+        }
+
+        match output {
+            Ok(_) => {
+                println!("Packages updated!");
+            }
+            Err(e) => eprintln!("{}", e),
+        }
     }
 
     fn function_two(&mut self) {
