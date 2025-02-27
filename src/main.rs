@@ -1,18 +1,55 @@
 use crossterm::{
-    event::{self, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode},
     execute,
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, List, ListItem},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Terminal,
 };
 use std::{io, thread, time::Duration};
 
+struct App {
+    menu_items: Vec<(&'static str, fn() -> String)>,
+    menu_state: usize,
+    output: String,
+}
+
+impl App {
+    fn new() -> Self {
+        Self {
+            menu_items: vec![
+                ("Say Hello", say_hello),
+                ("Print Time", print_time),
+                ("Exit", || "Exiting...".to_string()),
+            ],
+            menu_state: 0,
+            output: "Select an option and press Enter.".to_string(),
+        }
+    }
+
+    fn next(&mut self) {
+        if self.menu_state < self.menu_items.len() - 1 {
+            self.menu_state += 1;
+        }
+    }
+
+    fn previous(&mut self) {
+        if self.menu_state > 0 {
+            self.menu_state -= 1;
+        }
+    }
+
+    fn execute_current(&mut self) {
+        self.output = (self.menu_items[self.menu_state].1)();
+    }
+}
+
 fn main() -> io::Result<()> {
-    // Setup terminal
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     terminal::enable_raw_mode()?;
@@ -20,81 +57,76 @@ fn main() -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let menu_items = vec!["Say Hello", "Print Time", "Exit"];
-    let mut selected = 0;
+    let mut app = App::new();
 
     loop {
         terminal.draw(|f| {
-            let size = f.size();
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(vec![Constraint::Percentage(100)])
-                .split(size);
+                .margin(1)
+                .constraints([
+                    Constraint::Length(6), // Menü
+                    Constraint::Min(1),    // Çıktı alanı
+                ])
+                .split(f.size());
 
-            let items: Vec<ListItem> = menu_items
+            let items: Vec<ListItem> = app
+                .menu_items
                 .iter()
                 .enumerate()
-                .map(|(i, &item)| {
-                    let content = if i == selected {
-                        format!("> {}", item) // Highlight selected item
+                .map(|(i, (name, _))| {
+                    let style = if i == app.menu_state {
+                        Style::default().fg(Color::Black).bg(Color::White)
                     } else {
-                        format!("  {}", item)
+                        Style::default().fg(Color::White)
                     };
+
+                    let content = Line::from(vec![Span::styled(name.to_string(), style)]);
                     ListItem::new(content)
                 })
                 .collect();
 
-            let list = List::new(items).block(Block::default().title("Menu").borders(Borders::ALL));
+            let menu = List::new(items)
+                .block(Block::default().title("Menu").borders(Borders::ALL))
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::White)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD),
+                );
 
-            f.render_widget(list, chunks[0]);
+            let output = Paragraph::new(Line::from(app.output.as_str()));
+            f.render_widget(menu, chunks[0]);
+            f.render_widget(output, chunks[1]);
         })?;
 
-        // Handle input
-        if event::poll(Duration::from_millis(100))? {
-            if let event::Event::Key(KeyEvent {
-                code, modifiers, ..
-            }) = event::read()?
-            {
-                match code {
-                    KeyCode::Up => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
+        if let Event::Key(key) = event::read()? {
+            match key.code {
+                KeyCode::Char('q') => break,
+                KeyCode::Down | KeyCode::Char('j') => app.next(),
+                KeyCode::Up | KeyCode::Char('k') => app.previous(),
+                KeyCode::Enter => {
+                    if app.menu_state == app.menu_items.len() - 1 {
+                        break; // Exit seçildiyse çık
                     }
-                    KeyCode::Down => {
-                        if selected < menu_items.len() - 1 {
-                            selected += 1;
-                        }
-                    }
-                    KeyCode::Enter => {
-                        match selected {
-                            0 => say_hello(),
-                            1 => print_time(),
-                            2 => break, // Exit app
-                            _ => {}
-                        }
-                    }
-                    KeyCode::Char('q') | KeyCode::Esc => break, // Quit app
-                    _ => {}
+                    app.execute_current();
                 }
+                _ => {}
             }
         }
     }
 
-    // Cleanup terminal
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
     Ok(())
 }
 
-// Functions executed by menu items
-fn say_hello() {
-    println!("Hello, World!");
-    thread::sleep(Duration::from_secs(1));
+// Menüde çalıştırılacak fonksiyonlar
+fn say_hello() -> String {
+    "Hello, World!".to_string()
 }
 
-fn print_time() {
+fn print_time() -> String {
     let now = chrono::Local::now();
-    println!("Current Time: {}", now.format("%Y-%m-%d %H:%M:%S"));
-    thread::sleep(Duration::from_secs(1));
+    format!("Current Time: {}", now.format("%Y-%m-%d %H:%M:%S"))
 }
