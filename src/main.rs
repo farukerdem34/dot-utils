@@ -15,7 +15,6 @@ use ratatui::{
 use std::env;
 use std::io;
 use std::process::Command;
-// Define our menu options
 enum MenuItem {
     UpdatePackages,
     CloneRepo,
@@ -25,11 +24,9 @@ enum MenuItem {
 }
 
 struct App {
-    // existing fields...
     menu_state: usize,
     menu_items: Vec<(&'static str, MenuItem)>,
     output: String,
-    // Add these new fields:
     log_messages: Vec<String>,
     scroll_offset: u16,
 }
@@ -51,10 +48,8 @@ impl App {
         }
     }
 
-    // Add this method to log messages to the bottom area
     fn log_message(&mut self, message: &str) {
         self.log_messages.push(message.to_string());
-        // Keep only the last 100 messages to prevent memory issues
         if self.log_messages.len() > 100 {
             self.log_messages.remove(0);
         }
@@ -77,7 +72,7 @@ impl App {
             MenuItem::CloneRepo => self.clone_repository(),
             MenuItem::UpgradePackages => self.upgrade_packages(),
             MenuItem::InstallPackages => self.install_packages(),
-            MenuItem::Quit => {} // Handled in main loop
+            MenuItem::Quit => {}
         }
     }
     fn get_package_manager(&mut self) -> String {
@@ -204,10 +199,8 @@ impl App {
         ];
 
         let aur_packages = vec!["bat", "fzf", "starship"];
-        // Gerekli komutu oluştur ve çalıştır
         let result = match package_manager.as_str() {
             "apt" => {
-                // apt için birden fazla paket kurulumu
                 let mut command = Command::new("sudo");
                 command.arg("apt").arg("install").arg("-y");
 
@@ -222,7 +215,6 @@ impl App {
                 install_starship.arg("/tmp/starship.sh");
                 install_starship.spawn();
 
-                // Paketleri ekleyin
                 for package in packages {
                     command.arg(package);
                 }
@@ -231,11 +223,9 @@ impl App {
                 self.output = String::from("Packages Installed!");
             }
             "yay" => {
-                // yay için birden fazla paket kurulumu
                 let mut command = Command::new("yay");
                 command.arg("-S").arg("--noconfirm");
 
-                // Paketleri ekleyin
                 for package in packages {
                     command.arg(package);
                 }
@@ -247,11 +237,9 @@ impl App {
                 self.output = String::from("Packages Installed!");
             }
             "pacman" => {
-                // pacman için birden fazla paket kurulumu
                 let mut command = Command::new("sudo");
                 command.arg("pacman").arg("-S").arg("--noconfirm");
 
-                // Paketleri ekleyin
                 for package in packages {
                     command.arg(package);
                 }
@@ -267,18 +255,15 @@ impl App {
 }
 
 fn main() -> Result<(), io::Error> {
-    // Setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, terminal::EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app and run it
     let app = App::new();
     let res = run_app(&mut terminal, app);
 
-    // Restore terminal
     terminal::disable_raw_mode()?;
     execute!(terminal.backend_mut(), terminal::LeaveAlternateScreen)?;
     terminal.show_cursor()?;
@@ -296,21 +281,19 @@ fn run_app<B: ratatui::backend::Backend>(
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
-            // Split the screen into three sections
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints(
                     [
-                        Constraint::Length(6),      // Menu
-                        Constraint::Percentage(50), // Main content area
-                        Constraint::Min(5),         // Bottom log area
+                        Constraint::Length(6),
+                        Constraint::Percentage(50),
+                        Constraint::Min(5),
                     ]
                     .as_ref(),
                 )
                 .split(f.size());
 
-            // Create menu items
             let items: Vec<ListItem> = app
                 .menu_items
                 .iter()
@@ -322,13 +305,11 @@ fn run_app<B: ratatui::backend::Backend>(
                         Style::default().fg(Color::White)
                     };
 
-                    // Using Line instead of Spans
                     let content = Line::from(vec![Span::styled(name.to_string(), style)]);
                     ListItem::new(content)
                 })
                 .collect();
 
-            // Create menu widget - Make sure this is defined before it's used
             let menu = List::new(items)
                 .block(Block::default().title("Menu").borders(Borders::ALL))
                 .highlight_style(
@@ -338,16 +319,11 @@ fn run_app<B: ratatui::backend::Backend>(
                         .add_modifier(Modifier::BOLD),
                 );
 
-            // Create main output widget
             let output = Paragraph::new(Line::from(app.output.as_str()))
                 .block(Block::default().title("Output").borders(Borders::ALL));
 
-            // Render the widgets
             f.render_widget(menu, chunks[0]);
             f.render_widget(output, chunks[1]);
-
-            // If you want to implement the log area, you need to modify the App struct
-            // to include log_messages and scroll_offset fields first
         })?;
 
         if let Event::Key(key) = event::read()? {
