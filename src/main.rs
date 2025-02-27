@@ -199,7 +199,7 @@ impl App {
         ];
 
         let aur_packages = vec!["bat", "fzf", "starship"];
-        let result = match package_manager.as_str() {
+        let _result = match package_manager.as_str() {
             "apt" => {
                 let mut command = Command::new("sudo");
                 command.arg("apt").arg("install").arg("-y");
@@ -209,17 +209,17 @@ impl App {
                     .arg("-fsSL")
                     .arg("https://starship.rs/install.sh");
                 starship_cmd.arg("-o").arg("/tmp/starship.sh");
-                starship_cmd.spawn();
+                let _ = starship_cmd.spawn();
 
                 let mut install_starship = Command::new("bash");
                 install_starship.arg("/tmp/starship.sh");
-                install_starship.spawn();
+                let _ = install_starship.spawn();
 
                 for package in packages {
                     command.arg(package);
                 }
 
-                command.output();
+                let _ = command.output();
                 self.output = String::from("Packages Installed!");
             }
             "yay" => {
@@ -233,7 +233,7 @@ impl App {
                 for aur_package in aur_packages {
                     command.arg(aur_package);
                 }
-                command.output();
+                let _ = command.output();
                 self.output = String::from("Packages Installed!");
             }
             "pacman" => {
@@ -246,7 +246,7 @@ impl App {
                 for aur_package in aur_packages {
                     command.arg(aur_package);
                 }
-                command.spawn();
+                let _ = command.spawn();
                 self.output = String::from("Packages Installed!");
             }
             _ => self.output = String::from("No valid package manager found!"),
