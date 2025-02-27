@@ -20,6 +20,7 @@ enum MenuItem {
     UpdatePackages,
     CloneRepo,
     UpgradePackages,
+    InstallPackages,
     Quit,
 }
 
@@ -40,6 +41,7 @@ impl App {
             menu_items: vec![
                 ("Update Packages", MenuItem::UpdatePackages),
                 ("Upgrade Packages", MenuItem::UpgradePackages),
+                ("Install Packages", MenuItem::InstallPackages),
                 ("Clone Repository", MenuItem::CloneRepo),
                 ("Quit", MenuItem::Quit),
             ],
@@ -74,6 +76,7 @@ impl App {
             MenuItem::UpdatePackages => self.update_pkgs(),
             MenuItem::CloneRepo => self.clone_repository(),
             MenuItem::UpgradePackages => self.upgrade_packages(),
+            MenuItem::InstallPackages => self.install_packages(),
             MenuItem::Quit => {} // Handled in main loop
         }
     }
@@ -183,6 +186,83 @@ impl App {
             _ => self.output = String::from("No valid package manager found!"),
         }
         self.output = String::from("Function Three executed!");
+    }
+    fn install_packages(&mut self) {
+        let package_manager = self.get_package_manager();
+        let packages = vec![
+            "bash",
+            "btop",
+            "fastfetch",
+            "kitty",
+            "nvim",
+            "starship",
+            "tmux",
+            "vim",
+            "zsh",
+            "zoxide",
+            "stow",
+        ];
+
+        let aur_packages = vec!["bat", "fzf", "starship"];
+        // Gerekli komutu oluştur ve çalıştır
+        let result = match package_manager.as_str() {
+            "apt" => {
+                // apt için birden fazla paket kurulumu
+                let mut command = Command::new("sudo");
+                command.arg("apt").arg("install").arg("-y");
+
+                let mut starship_cmd = Command::new("curl");
+                starship_cmd
+                    .arg("-fsSL")
+                    .arg("https://starship.rs/install.sh");
+                starship_cmd.arg("-o").arg("/tmp/starship.sh");
+                starship_cmd.spawn();
+
+                let mut install_starship = Command::new("bash");
+                install_starship.arg("/tmp/starship.sh");
+                install_starship.spawn();
+
+                // Paketleri ekleyin
+                for package in packages {
+                    command.arg(package);
+                }
+
+                command.output();
+                self.output = String::from("Packages Installed!");
+            }
+            "yay" => {
+                // yay için birden fazla paket kurulumu
+                let mut command = Command::new("yay");
+                command.arg("-S").arg("--noconfirm");
+
+                // Paketleri ekleyin
+                for package in packages {
+                    command.arg(package);
+                }
+
+                for aur_package in aur_packages {
+                    command.arg(aur_package);
+                }
+                command.output();
+                self.output = String::from("Packages Installed!");
+            }
+            "pacman" => {
+                // pacman için birden fazla paket kurulumu
+                let mut command = Command::new("sudo");
+                command.arg("pacman").arg("-S").arg("--noconfirm");
+
+                // Paketleri ekleyin
+                for package in packages {
+                    command.arg(package);
+                }
+                for aur_package in aur_packages {
+                    command.arg(aur_package);
+                }
+                command.spawn();
+                self.output = String::from("Packages Installed!");
+            }
+            _ => self.output = String::from("No valid package manager found!"),
+        };
     }
 }
 
