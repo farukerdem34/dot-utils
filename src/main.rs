@@ -1,9 +1,10 @@
-use chrono::{format, prelude};
+use chrono::format;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use git2::Repository;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -12,12 +13,13 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Terminal,
 };
+use std::env;
 use std::io;
 use std::process::Command;
 // Define our menu options
 enum MenuItem {
     UpdatePackages,
-    Option2,
+    CloneRepo,
     Option3,
     Quit,
 }
@@ -34,7 +36,7 @@ impl App {
             menu_state: 0,
             menu_items: vec![
                 ("Update Packages", MenuItem::UpdatePackages),
-                ("Option 2", MenuItem::Option2),
+                ("Clone Repository", MenuItem::CloneRepo),
                 ("Option 3", MenuItem::Option3),
                 ("Quit", MenuItem::Quit),
             ],
@@ -57,7 +59,7 @@ impl App {
     fn execute_current(&mut self) {
         match self.menu_items[self.menu_state].1 {
             MenuItem::UpdatePackages => self.update_pkgs(),
-            MenuItem::Option2 => self.function_two(),
+            MenuItem::CloneRepo => self.clone_repository(),
             MenuItem::Option3 => self.function_three(),
             MenuItem::Quit => {} // Handled in main loop
         }
@@ -114,8 +116,21 @@ impl App {
         }
     }
 
-    fn function_two(&mut self) {
-        self.output = String::from("Function Two executed!");
+    fn clone_repo(&self) {
+        let repo_url = String::from("https://github.com/farukerdem34/dotfiles.git");
+        let home_folder = env::var("HOME").expect("$HOME envirenment variable is not set!");
+
+        let clone_path = format!("{}/.dotfiles", &home_folder);
+        dbg!(&clone_path);
+        dbg!(&home_folder);
+        match Repository::clone(&repo_url, &clone_path) {
+            Ok(_) => println!("Repo başarıyla klonlandı!"),
+            Err(e) => eprintln!("Hata oluştu: {}", e),
+        }
+    }
+    fn clone_repository(&mut self) {
+        self.clone_repo();
+        self.output = String::from("Dotfiles cloned succesfully!");
     }
 
     fn function_three(&mut self) {
