@@ -1,18 +1,14 @@
-use chrono::format;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, Event, KeyCode},
     execute,
-    terminal::{
-        self, disable_raw_mode, enable_raw_mode, ClearType, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
+    terminal::{self},
 };
 use git2::Repository;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Terminal,
 };
@@ -83,7 +79,6 @@ impl App {
     }
     fn get_package_manager(&mut self) -> String {
         let mut package_manager = String::new();
-
         let apt_check = Command::new("dpkg").arg("--version").output();
         let pacman_check = Command::new("pacman").arg("--version").output();
         let yay_check = Command::new("yay").arg("--version").output();
@@ -106,9 +101,8 @@ impl App {
 
     fn update_pkgs(&mut self) {
         let package_manager = self.get_package_manager();
-        let mut output;
+        let output;
         match package_manager.as_str() {
-            // as_str() ile &str formatına çeviriyoruz
             "apt" => {
                 output = Command::new("sudo")
                     .arg("apt")
@@ -127,23 +121,27 @@ impl App {
 
         match output {
             Ok(_) => {
-                self.output = String::from("Packages updated!");
+                self.output = String::from(format!(
+                    "Packages updated successfully with {}!",
+                    package_manager
+                ));
             }
             Err(e) => self.output = String::from(format!("{}", e)),
         }
     }
 
-    fn clone_repo(&self) -> String {
+    fn clone_repo(&mut self) -> String {
         let repo_url = String::from("https://github.com/farukerdem34/dotfiles.git");
         let home_folder = env::var("HOME").expect("$HOME envirenment variable is not set!");
-
         let clone_path = format!("{}/.dotfiles", &home_folder);
+
         match Repository::clone(&repo_url, &clone_path) {
             Ok(_) => String::from("Repository cloned successfully!"),
             Err(e) => e.to_string(),
         }
     }
     fn clone_repository(&mut self) {
+        self.output = String::from("Cloning repository...");
         let output = self.clone_repo();
         self.output = String::from(format!("{}", output));
     }
