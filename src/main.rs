@@ -19,7 +19,7 @@ use std::process::Command;
 enum MenuItem {
     UpdatePackages,
     CloneRepo,
-    Option3,
+    UpgradePackages,
     Quit,
 }
 
@@ -39,8 +39,8 @@ impl App {
             menu_state: 0,
             menu_items: vec![
                 ("Update Packages", MenuItem::UpdatePackages),
+                ("Upgrade Packages", MenuItem::UpgradePackages),
                 ("Clone Repository", MenuItem::CloneRepo),
-                ("Option 3", MenuItem::Option3),
                 ("Quit", MenuItem::Quit),
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
@@ -73,7 +73,7 @@ impl App {
         match self.menu_items[self.menu_state].1 {
             MenuItem::UpdatePackages => self.update_pkgs(),
             MenuItem::CloneRepo => self.clone_repository(),
-            MenuItem::Option3 => self.function_three(),
+            MenuItem::UpgradePackages => self.upgrade_packages(),
             MenuItem::Quit => {} // Handled in main loop
         }
     }
@@ -146,7 +146,42 @@ impl App {
         self.output = String::from(format!("{}", output));
     }
 
-    fn function_three(&mut self) {
+    fn upgrade_packages(&mut self) {
+        let package_manager = self.get_package_manager();
+        match package_manager.as_str() {
+            "apt" => {
+                let output = Command::new("sudo")
+                    .arg("apt")
+                    .arg("upgrade")
+                    .arg("-y")
+                    .output();
+                match output {
+                    Ok(_) => {
+                        self.output = String::from("Packages upgraded successfully!");
+                    }
+                    Err(e) => self.output = String::from(format!("{}", e)),
+                }
+            }
+            "yay" => {
+                let output = Command::new("yay").arg("-Syu").output();
+                match output {
+                    Ok(_) => {
+                        self.output = String::from("Packages upgraded successfully!");
+                    }
+                    Err(e) => self.output = String::from(format!("{}", e)),
+                }
+            }
+            "pacman" => {
+                let output = Command::new("sudo").arg("pacman").arg("-Syu").output();
+                match output {
+                    Ok(_) => {
+                        self.output = String::from("Packages upgraded successfully!");
+                    }
+                    Err(e) => self.output = String::from(format!("{}", e)),
+                }
+            }
+            _ => self.output = String::from("No valid package manager found!"),
+        }
         self.output = String::from("Function Three executed!");
     }
 }
