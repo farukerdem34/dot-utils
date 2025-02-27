@@ -2,7 +2,10 @@ use chrono::format;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        self, disable_raw_mode, enable_raw_mode, ClearType, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
 use git2::Repository;
 use ratatui::{
@@ -25,9 +28,13 @@ enum MenuItem {
 }
 
 struct App {
+    // existing fields...
     menu_state: usize,
     menu_items: Vec<(&'static str, MenuItem)>,
     output: String,
+    // Add these new fields:
+    log_messages: Vec<String>,
+    scroll_offset: u16,
 }
 
 impl App {
@@ -41,9 +48,19 @@ impl App {
                 ("Quit", MenuItem::Quit),
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
+            log_messages: Vec::new(),
+            scroll_offset: 0,
         }
     }
 
+    // Add this method to log messages to the bottom area
+    fn log_message(&mut self, message: &str) {
+        self.log_messages.push(message.to_string());
+        // Keep only the last 100 messages to prevent memory issues
+        if self.log_messages.len() > 100 {
+            self.log_messages.remove(0);
+        }
+    }
     fn next(&mut self) {
         self.menu_state = (self.menu_state + 1) % self.menu_items.len();
     }
@@ -110,27 +127,25 @@ impl App {
 
         match output {
             Ok(_) => {
-                println!("Packages updated!");
+                self.output = String::from("Packages updated!");
             }
-            Err(e) => eprintln!("{}", e),
+            Err(e) => self.output = String::from(format!("{}", e)),
         }
     }
 
-    fn clone_repo(&self) {
+    fn clone_repo(&self) -> String {
         let repo_url = String::from("https://github.com/farukerdem34/dotfiles.git");
         let home_folder = env::var("HOME").expect("$HOME envirenment variable is not set!");
 
         let clone_path = format!("{}/.dotfiles", &home_folder);
-        dbg!(&clone_path);
-        dbg!(&home_folder);
         match Repository::clone(&repo_url, &clone_path) {
-            Ok(_) => println!("Repo başarıyla klonlandı!"),
-            Err(e) => eprintln!("Hata oluştu: {}", e),
+            Ok(output) => output.path().to_str().unwrap().to_string(),
+            Err(e) => e.to_string(),
         }
     }
     fn clone_repository(&mut self) {
-        self.clone_repo();
-        self.output = String::from("Dotfiles cloned succesfully!");
+        let output = self.clone_repo();
+        self.output = String::from(format!("{}", output));
     }
 
     fn function_three(&mut self) {
@@ -140,9 +155,9 @@ impl App {
 
 fn main() -> Result<(), io::Error> {
     // Setup terminal
-    enable_raw_mode()?;
+    terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, terminal::EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -151,12 +166,8 @@ fn main() -> Result<(), io::Error> {
     let res = run_app(&mut terminal, app);
 
     // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
+    terminal::disable_raw_mode()?;
+    execute!(terminal.backend_mut(), terminal::LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
     if let Err(err) = res {
@@ -172,14 +183,15 @@ fn run_app<B: ratatui::backend::Backend>(
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
-            // Split the screen into two sections
+            // Split the screen into three sections
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints(
                     [
-                        Constraint::Length(6), // Menu
-                        Constraint::Min(1),    // Output area
+                        Constraint::Length(6),      // Menu
+                        Constraint::Percentage(50), // Main content area
+                        Constraint::Min(5),         // Bottom log area
                     ]
                     .as_ref(),
                 )
@@ -203,7 +215,7 @@ fn run_app<B: ratatui::backend::Backend>(
                 })
                 .collect();
 
-            // Create menu widget
+            // Create menu widget - Make sure this is defined before it's used
             let menu = List::new(items)
                 .block(Block::default().title("Menu").borders(Borders::ALL))
                 .highlight_style(
@@ -213,10 +225,16 @@ fn run_app<B: ratatui::backend::Backend>(
                         .add_modifier(Modifier::BOLD),
                 );
 
-            // Create output widget
-            let output = Paragraph::new(Line::from(app.output.as_str()));
+            // Create main output widget
+            let output = Paragraph::new(Line::from(app.output.as_str()))
+                .block(Block::default().title("Output").borders(Borders::ALL));
+
+            // Render the widgets
             f.render_widget(menu, chunks[0]);
             f.render_widget(output, chunks[1]);
+
+            // If you want to implement the log area, you need to modify the App struct
+            // to include log_messages and scroll_offset fields first
         })?;
 
         if let Event::Key(key) = event::read()? {
