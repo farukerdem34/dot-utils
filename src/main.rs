@@ -139,7 +139,7 @@ impl App {
 
         let clone_path = format!("{}/.dotfiles", &home_folder);
         match Repository::clone(&repo_url, &clone_path) {
-            Ok(output) => output.path().to_str().unwrap().to_string(),
+            Ok(_) => String::from("Repository cloned successfully!"),
             Err(e) => e.to_string(),
         }
     }
