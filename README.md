@@ -1,7 +1,7 @@
 # Dot-Utils
 
 ![GitHub top language](https://img.shields.io/github/languages/top/farukerdem34/dot-utils?style=flat-square)
-![License](https://img.shields.io/github/license/farukerdem34/dot-utils?style=flat-square)
+![License](https://img.shields.io/github/license/farukerdem34/dot-utils?style=flat-square)- Last updated: 2025-02-28
 
 A terminal-based utility tool written in Rust for managing your dotfiles and system packages across different Linux distributions.
 
