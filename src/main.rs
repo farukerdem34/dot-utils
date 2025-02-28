@@ -1,22 +1,13 @@
 mod terminal_loop;
 mod utils;
 use crossterm::{
-    event::{self, Event, KeyCode},
     execute,
     terminal::{self},
 };
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use terminal_loop::run_app;
 use utils::App;
-use utils::MenuItem;
 fn main() -> Result<(), io::Error> {
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
