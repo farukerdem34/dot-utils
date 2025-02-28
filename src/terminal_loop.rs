@@ -15,7 +15,7 @@ pub fn run_app<B: ratatui::backend::Backend>(
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| {
-            let chunks = Layout::default()
+            let main_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints(
@@ -27,6 +27,18 @@ pub fn run_app<B: ratatui::backend::Backend>(
                     .as_ref(),
                 )
                 .split(f.size());
+
+            let menu_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(
+                    [
+                        Constraint::Percentage(25), // Left margin
+                        Constraint::Percentage(50), // Center area for menu
+                        Constraint::Percentage(25), // Right margin
+                    ]
+                    .as_ref(),
+                )
+                .split(main_chunks[0]);
 
             let items: Vec<ListItem> = app
                 .menu_items
@@ -56,8 +68,8 @@ pub fn run_app<B: ratatui::backend::Backend>(
             let output = Paragraph::new(Line::from(app.output.as_str()))
                 .block(Block::default().title("Output").borders(Borders::ALL));
 
-            f.render_widget(menu, chunks[0]);
-            f.render_widget(output, chunks[1]);
+            f.render_widget(menu, menu_chunks[1]);
+            f.render_widget(output, main_chunks[2]);
         })?;
 
         if let Event::Key(key) = event::read()? {
