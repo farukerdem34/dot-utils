@@ -2,10 +2,13 @@ use git2::Repository;
 use std::env;
 
 use std::process::Command;
+
 pub struct App {
     pub menu_state: usize,
     pub menu_items: Vec<(&'static str, MenuItem)>,
     pub output: String,
+    packages: Vec<&'static str>,
+    aur_packages: Vec<&'static str>,
 }
 
 pub enum MenuItem {
@@ -28,6 +31,20 @@ impl App {
                 ("Quit", MenuItem::Quit),
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
+            packages: vec![
+                "bash",
+                "btop",
+                "fastfetch",
+                "kitty",
+                "nvim",
+                "starship",
+                "tmux",
+                "vim",
+                "zsh",
+                "zoxide",
+                "stow",
+            ],
+            aur_packages: vec!["bat", "fzf", "starship"],
         }
     }
 
@@ -161,21 +178,7 @@ impl App {
     }
     fn install_packages(&mut self) {
         let package_manager = self.get_package_manager();
-        let packages = vec![
-            "bash",
-            "btop",
-            "fastfetch",
-            "kitty",
-            "nvim",
-            "starship",
-            "tmux",
-            "vim",
-            "zsh",
-            "zoxide",
-            "stow",
-        ];
 
-        let aur_packages = vec!["bat", "fzf", "starship"];
         let _result = match package_manager.as_str() {
             "apt" => {
                 let mut command = Command::new("sudo");
@@ -192,7 +195,7 @@ impl App {
                 install_starship.arg("/tmp/starship.sh");
                 let _ = install_starship.spawn();
 
-                for package in packages {
+                for package in &self.packages {
                     command.arg(package);
                 }
 
@@ -203,11 +206,11 @@ impl App {
                 let mut command = Command::new("yay");
                 command.arg("-S").arg("--noconfirm");
 
-                for package in packages {
+                for package in &self.packages {
                     command.arg(package);
                 }
 
-                for aur_package in aur_packages {
+                for aur_package in &self.aur_packages {
                     command.arg(aur_package);
                 }
                 let _ = command.output();
@@ -217,10 +220,10 @@ impl App {
                 let mut command = Command::new("sudo");
                 command.arg("pacman").arg("-S").arg("--noconfirm");
 
-                for package in packages {
+                for package in &self.packages {
                     command.arg(package);
                 }
-                for aur_package in aur_packages {
+                for aur_package in &self.aur_packages {
                     command.arg(aur_package);
                 }
                 let _ = command.spawn();
