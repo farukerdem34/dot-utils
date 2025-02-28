@@ -18,6 +18,7 @@ pub enum MenuItem {
     InstallPackages,
     LinkDotFiles,
     UnLinkDotFiles,
+    SyncDotFiles,
     Quit,
 }
 
@@ -32,6 +33,7 @@ impl App {
                 ("Clone Repository", MenuItem::CloneRepo),
                 ("Link Dotfiles", MenuItem::LinkDotFiles),
                 ("Unlink Dotfiles", MenuItem::UnLinkDotFiles),
+                ("Sync Dotfiles", MenuItem::SyncDotFiles),
                 ("Quit", MenuItem::Quit),
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
@@ -72,6 +74,7 @@ impl App {
             MenuItem::InstallPackages => self.install_packages(),
             MenuItem::LinkDotFiles => self.link_dot_files(),
             MenuItem::UnLinkDotFiles => self.unstow_dot_files(),
+            MenuItem::SyncDotFiles => self.update_dotfiles(),
             MenuItem::Quit => {}
         }
     }
@@ -386,6 +389,185 @@ impl App {
             self.output = String::from("Failed to unstow dotfiles. Errors encountered:");
             for msg in error_messages {
                 self.output.push_str(&format!("\n- {}", msg));
+            }
+        }
+    }
+
+    fn update_dotfiles(&mut self) {
+        self.output = String::from("Updating dotfiles repository...");
+
+        let home_folder = self.get_home_directory();
+        let dotfiles_path = format!("{}/.dotfiles", &home_folder);
+
+        // Check if the .dotfiles directory exists
+        if !Path::new(&dotfiles_path).exists() {
+            self.output =
+                String::from("Dotfiles directory not found. Try cloning the repository first.");
+            return;
+        }
+
+        // Open the repository
+        match Repository::open(&dotfiles_path) {
+            Ok(repo) => {
+                // Get the remote
+                match repo.find_remote("origin") {
+                    Ok(mut remote) => {
+                        // Fetch updates
+                        let fetch_result =
+                            remote.fetch(&["refs/heads/*:refs/remotes/origin/*"], None, None);
+                        if let Err(e) = fetch_result {
+                            self.output = format!("Failed to fetch from remote: {}", e);
+                            return;
+                        }
+
+                        // Get default branch reference
+                        let head = match repo.head() {
+                            Ok(head) => head,
+                            Err(e) => {
+                                self.output = format!("Failed to get HEAD reference: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Get current branch name
+                        let branch_name = match head.shorthand() {
+                            Some(name) => name,
+                            None => {
+                                self.output =
+                                    String::from("Failed to determine current branch name");
+                                return;
+                            }
+                        };
+
+                        // Lookup the remote branch we want to merge from
+                        let remote_branch_name = format!("origin/{}", branch_name);
+                        let remote_ref = match repo
+                            .find_reference(&format!("refs/remotes/{}", remote_branch_name))
+                        {
+                            Ok(reference) => reference,
+                            Err(e) => {
+                                self.output = format!("Failed to find remote reference: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Convert the reference to an annotated commit
+                        let annotated_commit = match repo.reference_to_annotated_commit(&remote_ref)
+                        {
+                            Ok(commit) => commit,
+                            Err(e) => {
+                                self.output = format!("Failed to get annotated commit: {}", e);
+                                return;
+                            }
+                        };
+
+                        let fetch_commit = match remote_ref.peel_to_commit() {
+                            Ok(commit) => commit,
+                            Err(e) => {
+                                self.output = format!("Failed to get remote commit: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Perform the merge/pull
+                        let mut index = match repo.index() {
+                            Ok(index) => index,
+                            Err(e) => {
+                                self.output = format!("Failed to get repository index: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Create merge options
+                        let mut merge_options = git2::MergeOptions::new();
+                        merge_options.file_favor(git2::FileFavor::Normal);
+
+                        // Merge the remote branch into the current branch
+                        if let Err(e) =
+                            repo.merge(&[&annotated_commit], Some(&mut merge_options), None)
+                        {
+                            self.output = format!("Failed to merge updates: {}", e);
+                            return;
+                        }
+
+                        // Check for merge conflicts
+                        if index.has_conflicts() {
+                            self.output = String::from(
+                                "Merge conflicts detected. Please resolve them manually.",
+                            );
+                            return;
+                        }
+
+                        // Commit the merge if necessary
+                        let result = repo.state();
+                        if result == git2::RepositoryState::Merge {
+                            // We need to commit the merge
+                            let signature = match repo.signature() {
+                                Ok(sig) => sig,
+                                Err(e) => {
+                                    self.output = format!("Failed to create signature: {}", e);
+                                    return;
+                                }
+                            };
+
+                            if let Err(e) = index.write() {
+                                self.output = format!("Failed to write index: {}", e);
+                                return;
+                            }
+
+                            let tree_oid = match index.write_tree() {
+                                Ok(oid) => oid,
+                                Err(e) => {
+                                    self.output = format!("Failed to write tree: {}", e);
+                                    return;
+                                }
+                            };
+
+                            let tree = match repo.find_tree(tree_oid) {
+                                Ok(tree) => tree,
+                                Err(e) => {
+                                    self.output = format!("Failed to find tree: {}", e);
+                                    return;
+                                }
+                            };
+
+                            let head_commit =
+                                match repo.head().and_then(|head| head.peel_to_commit()) {
+                                    Ok(commit) => commit,
+                                    Err(e) => {
+                                        self.output = format!("Failed to get HEAD commit: {}", e);
+                                        return;
+                                    }
+                                };
+
+                            if let Err(e) = repo.commit(
+                                Some("HEAD"),
+                                &signature,
+                                &signature,
+                                "Merge remote changes",
+                                &tree,
+                                &[&head_commit, &fetch_commit],
+                            ) {
+                                self.output = format!("Failed to commit merge: {}", e);
+                                return;
+                            }
+
+                            // Clean up the repository state
+                            if let Err(e) = repo.cleanup_state() {
+                                self.output = format!("Failed to cleanup repository state: {}", e);
+                                return;
+                            }
+                        }
+
+                        self.output = String::from("Dotfiles repository updated successfully!");
+                    }
+                    Err(e) => {
+                        self.output = format!("Failed to find remote 'origin': {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                self.output = format!("Failed to open repository: {}", e);
             }
         }
     }
