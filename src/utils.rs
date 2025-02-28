@@ -432,7 +432,7 @@ impl App {
                         // Get current branch name
                         let branch_name = match head.shorthand() {
                             Some(name) => name,
-                            None => {
+                            _ => {
                                 self.output =
                                     String::from("Failed to determine current branch name");
                                 return;
