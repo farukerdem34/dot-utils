@@ -34,7 +34,7 @@ A terminal-based utility tool written in Rust for managing your dotfiles and sys
 
 ## Installation
 
-### From Source
+### Standard Build
 
 1. Clone this repository:
 
@@ -55,10 +55,66 @@ A terminal-based utility tool written in Rust for managing your dotfiles and sys
    ./target/release/dot-utils
    ```
 
+4. (Optional) Install the binary to your system:
+
+   ```bash
+   cargo install --path .
+   ```
+
 ### Using Cargo
 
 ```bash
 cargo install --git https://github.com/farukerdem34/dot-utils.git
+```
+
+### Docker Build
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/farukerdem34/dot-utils.git
+   cd dot-utils
+   ```
+
+2. Build the Docker image:
+
+   ```bash
+   docker build -t dot-utils .
+   ```
+
+3. Run the container with proper permissions for accessing your home directory:
+
+   ```bash
+   docker run -it --rm \
+     -v $HOME:/home/user \
+     -v /var/run/docker.sock:/var/run/docker.sock \
+     --user $(id -u):$(id -g) \
+     dot-utils
+   ```
+
+#### Docker Compose (Alternative)
+
+Create a `docker-compose.yml` file with the following content:
+
+```yaml
+version: '3'
+services:
+  dot-utils:
+    build: .
+    volumes:
+      - $HOME:/home/user
+      - /var/run/docker.sock:/var/run/docker.sock
+    user: "${UID}:${GID}"
+    tty: true
+    stdin_open: true
+```
+
+Then run:
+
+```bash
+export UID=$(id -u)
+export GID=$(id -g)
+docker-compose up --build
 ```
 
 ## Usage
@@ -126,7 +182,7 @@ To customize the list of packages or dotfiles managed by this utility, modify th
    - Supports standard dotfile organization (one directory per application)
 
 3. **Repository Handling**:
-   - Clones dotfiles from [farukerdem34/dotfiles](https://github.com/farukerdem34/dotfiles.git)
+   - Clones dotfiles from <https://github.com/farukerdem34/dotfiles.git>
    - Handles git operations for syncing and updating
 
 ## Troubleshooting
@@ -138,13 +194,15 @@ To customize the list of packages or dotfiles managed by this utility, modify th
    - Use with sudo when necessary
 
 2. **Missing Stow**
-   - Install GNU Stow manually if needed:
-    - `sudo apt install stow`
-    - or `sudo pacman -S stow`
+   - Install GNU Stow manually if needed: `sudo apt install stow` or `sudo pacman -S stow`
 
 3. **Git Errors**
    - Make sure git is installed and properly configured
    - Check network connectivity for repository operations
+
+4. **Docker Issues**
+   - If using Docker, ensure you have mounted your home directory correctly
+   - Check that the container has proper permissions to access files
 
 ## Contributing
 
