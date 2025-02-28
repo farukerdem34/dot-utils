@@ -85,7 +85,7 @@ impl App {
     }
 
     fn get_package_manager(&mut self) -> String {
-        let mut package_manager = String::new();
+        let package_manager;
         let apt_check = Command::new("dpkg").arg("--version").output();
         let pacman_check = Command::new("pacman").arg("--version").output();
         let yay_check = Command::new("yay").arg("--version").output();
