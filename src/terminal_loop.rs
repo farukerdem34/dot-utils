@@ -20,7 +20,7 @@ pub fn run_app<B: ratatui::backend::Backend>(
                 .margin(1)
                 .constraints(
                     [
-                        Constraint::Length(6),
+                        Constraint::Length(app.menu_items.len() as u16 + 2),
                         Constraint::Percentage(50),
                         Constraint::Min(5),
                     ]
