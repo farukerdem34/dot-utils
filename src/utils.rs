@@ -17,6 +17,7 @@ pub enum MenuItem {
     UpgradePackages,
     InstallPackages,
     LinkDotFiles,
+    UnLinkDotFiles,
     Quit,
 }
 
@@ -30,6 +31,7 @@ impl App {
                 ("Install Packages", MenuItem::InstallPackages),
                 ("Clone Repository", MenuItem::CloneRepo),
                 ("Link Dotfiles", MenuItem::LinkDotFiles),
+                ("Unlink Dotfiles", MenuItem::UnLinkDotFiles),
                 ("Quit", MenuItem::Quit),
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
@@ -69,6 +71,7 @@ impl App {
             MenuItem::UpgradePackages => self.upgrade_packages(),
             MenuItem::InstallPackages => self.install_packages(),
             MenuItem::LinkDotFiles => self.link_dot_files(),
+            MenuItem::UnLinkDotFiles => self.unstow_dot_files(),
             MenuItem::Quit => {}
         }
     }
@@ -287,6 +290,103 @@ impl App {
             }
         } else {
             self.output = String::from("Stow package doesn't exists.")
+        }
+    }
+
+    fn unstow_dot_files(&mut self) {
+        // First, check if stow is installed
+        if !self.is_command_exist("stow", None) {
+            self.output = String::from("stow is not installed. Install it first.");
+            return;
+        }
+
+        // Get home directory and check if .dotfiles directory exists
+        let home_folder = self.get_home_directory();
+        let dotfiles_path = format!("{}/.dotfiles", &home_folder);
+
+        // Check if .dotfiles directory exists
+        let dotfiles_dir = std::path::Path::new(&dotfiles_path);
+        if !dotfiles_dir.exists() {
+            self.output = String::from("Dotfiles directory not found. Clone the repository first.");
+            return;
+        }
+
+        // Unstow each directory in .dotfiles
+        let dotfiles_contents = match std::fs::read_dir(&dotfiles_path) {
+            Ok(entries) => entries,
+            Err(e) => {
+                self.output = format!("Failed to read dotfiles directory: {}", e);
+                return;
+            }
+        };
+
+        let mut success_count = 0;
+        let mut error_messages = Vec::new();
+
+        for entry in dotfiles_contents {
+            if let Ok(entry) = entry {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let dir_name = entry.file_name();
+                        if let Some(dir_str) = dir_name.to_str() {
+                            // Skip .git directory and other hidden directories
+                            if dir_str.starts_with('.') {
+                                continue;
+                            }
+
+                            // Run stow -D command
+                            let output = std::process::Command::new("stow")
+                                .arg("-D") // Delete flag
+                                .arg("-v") // Verbose
+                                .arg("-d") // Directory
+                                .arg(&dotfiles_path) // Stow dir
+                                .arg("-t") // Target
+                                .arg(&home_folder) // Target dir
+                                .arg(dir_str) // Package name
+                                .output();
+
+                            match output {
+                                Ok(cmd_output) => {
+                                    if cmd_output.status.success() {
+                                        success_count += 1;
+                                    } else {
+                                        let error = String::from_utf8_lossy(&cmd_output.stderr);
+                                        error_messages.push(format!(
+                                            "Failed to unstow {}: {}",
+                                            dir_str, error
+                                        ));
+                                    }
+                                }
+                                Err(e) => {
+                                    error_messages
+                                        .push(format!("Command error for {}: {}", dir_str, e));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Build output message
+        if success_count > 0 {
+            self.output = format!(
+                "Successfully unstowed {} dotfile directories.",
+                success_count
+            );
+            if !error_messages.is_empty() {
+                self.output.push_str("\n\nErrors encountered:");
+                for msg in error_messages {
+                    self.output.push_str(&format!("\n- {}", msg));
+                }
+            }
+        } else if error_messages.is_empty() {
+            self.output = String::from("No dotfiles were found to unstow.");
+        } else {
+            self.output = String::from("Failed to unstow dotfiles. Errors encountered:");
+            for msg in error_messages {
+                self.output.push_str(&format!("\n- {}", msg));
+            }
         }
     }
 }
