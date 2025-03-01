@@ -127,10 +127,6 @@ impl App {
             }
         }
     }
-    // TO DO
-
-
-    fn backup_cache(&mut self) {}
     fn is_command_exist(&mut self, cmd: &str, checker: Option<&str>) -> bool {
         let checker = checker.unwrap_or("--version");
         let output = Command::new(&cmd).arg(&checker).output();
@@ -623,6 +619,8 @@ impl App {
             }
         }
     }
+
+    // NeoVim Menu Functions
     fn create_tar_gz(&self, src_dir: &str, dest_dir: &str) -> Result<(), std::io::Error> {
         let src_path = Path::new(src_dir);
 
@@ -679,6 +677,7 @@ impl App {
             }
         }
     }
+
     fn backup_state(&mut self) {
         let home = self.get_home_directory();
         let state_path = format!("{}/.local/state/nvim", home);
@@ -689,6 +688,20 @@ impl App {
             }
             Err(e) => {
                 self.output = format!("Failed to backup state directory: {}", e);
+            }
+        }
+    }
+
+    fn backup_cache(&mut self) {
+        let home = self.get_home_directory();
+        let cache_path = format!("{}/.cache/nvim", home);
+        let target_path = format!("{}/.cache/nvim.tar.gz", home);
+        match self.create_tar_gz(&cache_path, &target_path) {
+            Ok(_) => {
+                self.output = String::from("Cache directory backed up successfully!");
+            }
+            Err(e) => {
+                self.output = format!("Failed to backup cache directory: {}", e);
             }
         }
     }
