@@ -1,7 +1,11 @@
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use git2::Repository;
 use std::env;
+use std::fs::File;
 use std::path::Path;
 use std::process::Command;
+use tar::Builder;
 
 pub struct App {
     pub menu_state: usize,
