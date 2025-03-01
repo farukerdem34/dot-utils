@@ -625,4 +625,47 @@ impl App {
             }
         }
     }
+    fn create_tar_gz(&self, src_dir: &str, dest_dir: &str) -> Result<(), std::io::Error> {
+        let src_path = Path::new(src_dir);
+
+        if !src_path.exists() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Source directory {} not found", src_dir),
+            ));
+        }
+        let tar_gz = File::create(dest_dir)?;
+        let enc = GzEncoder::new(tar_gz, Compression::default());
+        let mut tar = Builder::new(enc);
+
+        fn add_files_to_tar<W: std::io::Write>(
+            tar: &mut Builder<W>,
+            src_dir: &Path,
+            base_path: &Path,
+        ) -> Result<(), std::io::Error> {
+            if src_dir.is_dir() {
+                for entry in std::fs::read_dir(src_dir)? {
+                    let entry = entry?;
+                    let path = entry.path();
+
+                    // Skip git directories
+                    if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                        continue;
+                    }
+
+                    if path.is_dir() {
+                        add_files_to_tar(tar, &path, base_path)?;
+                    } else {
+                        let rel_path = path.strip_prefix(base_path).unwrap_or(&path);
+                        tar.append_path_with_name(&path, rel_path)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        add_files_to_tar(&mut tar, src_path, src_path)?;
+        tar.finish()?;
+        Ok(())
+    }
 }
