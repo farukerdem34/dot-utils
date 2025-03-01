@@ -9,6 +9,9 @@ pub struct App {
     pub output: String,
     packages: Vec<&'static str>,
     aur_packages: Vec<&'static str>,
+    pub neovim_menu_items: Vec<(&'static str, NeoVimItem)>,
+    pub neovim_menu_state: usize,
+    pub is_in_neovim_menu: bool,
 }
 
 pub enum MenuItem {
@@ -19,7 +22,15 @@ pub enum MenuItem {
     LinkDotFiles,
     UnLinkDotFiles,
     SyncDotFiles,
+    NeoVimMenu,
     Quit,
+}
+
+pub enum NeoVimItem {
+    BackUpState,
+    BackUpShare,
+    BackupCache,
+    BackToMainMenu,
 }
 
 impl App {
@@ -34,6 +45,7 @@ impl App {
                 ("Link Dotfiles", MenuItem::LinkDotFiles),
                 ("Unlink Dotfiles", MenuItem::UnLinkDotFiles),
                 ("Sync Dotfiles", MenuItem::SyncDotFiles),
+                ("NeoVim",MenuItem::NeoVimMenu),
                 ("Quit", MenuItem::Quit),
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
@@ -51,23 +63,53 @@ impl App {
                 "stow",
             ],
             aur_packages: vec!["bat", "fzf", "starship"],
+            neovim_menu_items: vec![
+                ("Back Up State", NeoVimItem::BackUpState),
+                ("Back Up Share", NeoVimItem::BackUpShare),
+                ("Back Up Cache", NeoVimItem::BackupCache),
+                ("Back To Main Menu", NeoVimItem::BackToMainMenu),
+            ],
+            neovim_menu_state: 0,
+            is_in_neovim_menu: false,
         }
     }
 
     pub fn next(&mut self) {
+        if self.is_in_neovim_menu {
+            self.neovim_menu_state = (self.neovim_menu_state + 1) % self.neovim_menu_items.len();
+        }else{
+
         self.menu_state = (self.menu_state + 1) % self.menu_items.len();
+        }
     }
 
     pub fn previous(&mut self) {
+        if self.is_in_neovim_menu {
+    if self.neovim_menu_state > 0 {
+                self.neovim_menu_state -= 1;
+            } else {
+                self.neovim_menu_state = self.neovim_menu_items.len() - 1;
+            }
+    
+        }else{
         if self.menu_state > 0 {
             self.menu_state -= 1;
         } else {
             self.menu_state = self.menu_items.len() - 1;
         }
+        }
     }
 
     pub fn execute_current(&mut self) {
-        match self.menu_items[self.menu_state].1 {
+        if self.is_in_neovim_menu {
+            match self.neovim_menu_items[self.neovim_menu_state].1 {
+                NeoVimItem::BackUpState => self.backup_state(),
+                NeoVimItem::BackUpShare => self.backup_share(),
+                NeoVimItem::BackupCache => self.backup_cache(),
+                NeoVimItem::BackToMainMenu => self.is_in_neovim_menu = false,
+            }
+        }else{
+                    match self.menu_items[self.menu_state].1 {
             MenuItem::UpdatePackages => self.update_pkgs(),
             MenuItem::CloneRepo => self.clone_repository(),
             MenuItem::UpgradePackages => self.upgrade_packages(),
@@ -76,9 +118,23 @@ impl App {
             MenuItem::UnLinkDotFiles => self.unstow_dot_files(),
             MenuItem::SyncDotFiles => self.update_dotfiles(),
             MenuItem::Quit => {}
+            MenuItem::NeoVimMenu => {
+                self.is_in_neovim_menu = true;
+                self.output = String::from("Welcome to NeoVim Menu!");
+            }
+        }
+
         }
     }
+// TO DO 
+    fn backup_share(&mut self) {
+    }
 
+    fn backup_state(&mut self) {
+    }
+
+    fn backup_cache(&mut self) {
+    }
     fn is_command_exist(&mut self, cmd: &str, checker: Option<&str>) -> bool {
         let checker = checker.unwrap_or("--version");
         let output = Command::new(&cmd).arg(&checker).output();

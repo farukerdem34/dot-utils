@@ -9,6 +9,7 @@ use ratatui::{
     Terminal,
 };
 use std::io;
+
 pub fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     mut app: App,
@@ -20,7 +21,11 @@ pub fn run_app<B: ratatui::backend::Backend>(
                 .margin(1)
                 .constraints(
                     [
-                        Constraint::Length(app.menu_items.len() as u16 + 2),
+                        Constraint::Length(if app.is_in_neovim_menu {
+                            app.neovim_menu_items.len() as u16 + 2
+                        } else {
+                            app.menu_items.len() as u16 + 2
+                        }),
                         Constraint::Percentage(50),
                         Constraint::Min(5),
                     ]
@@ -40,24 +45,48 @@ pub fn run_app<B: ratatui::backend::Backend>(
                 )
                 .split(main_chunks[0]);
 
-            let items: Vec<ListItem> = app
-                .menu_items
-                .iter()
-                .enumerate()
-                .map(|(i, (name, _))| {
-                    let style = if i == app.menu_state {
-                        Style::default().fg(Color::Black).bg(Color::White)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
+            let items: Vec<ListItem> = if app.is_in_neovim_menu {
+                // Render submenu items
+                app.neovim_menu_items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name, _))| {
+                        let style = if i == app.neovim_menu_state {
+                            Style::default().fg(Color::Black).bg(Color::White)
+                        } else {
+                            Style::default().fg(Color::White)
+                        };
 
-                    let content = Line::from(vec![Span::styled(name.to_string(), style)]);
-                    ListItem::new(content)
-                })
-                .collect();
+                        let content = Line::from(vec![Span::styled(name.to_string(), style)]);
+                        ListItem::new(content)
+                    })
+                    .collect()
+            } else {
+                // Render main menu items
+                app.menu_items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name, _))| {
+                        let style = if i == app.menu_state {
+                            Style::default().fg(Color::Black).bg(Color::White)
+                        } else {
+                            Style::default().fg(Color::White)
+                        };
+
+                        let content = Line::from(vec![Span::styled(name.to_string(), style)]);
+                        ListItem::new(content)
+                    })
+                    .collect()
+            };
+
+            let menu_title = if app.is_in_neovim_menu {
+                "Advanced Options"
+            } else {
+                "Menu"
+            };
 
             let menu = List::new(items)
-                .block(Block::default().title("Menu").borders(Borders::ALL))
+                .block(Block::default().title(menu_title).borders(Borders::ALL))
                 .highlight_style(
                     Style::default()
                         .bg(Color::White)
@@ -74,14 +103,29 @@ pub fn run_app<B: ratatui::backend::Backend>(
 
         if let Event::Key(key) = event::read()? {
             match key.code {
-                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Char('q') => {
+                    if app.is_in_neovim_menu {
+                        app.is_in_neovim_menu = false;
+                        app.output = String::from("Returned to main menu. Select an option.");
+                    } else {
+                        return Ok(());
+                    }
+                },
                 KeyCode::Down | KeyCode::Char('j') => app.next(),
                 KeyCode::Up | KeyCode::Char('k') => app.previous(),
                 KeyCode::Enter => {
-                    if let MenuItem::Quit = app.menu_items[app.menu_state].1 {
+                    // If in main menu and user selects quit
+                    if !app.is_in_neovim_menu && 
+                       matches!(app.menu_items[app.menu_state].1, MenuItem::Quit) {
                         return Ok(());
                     }
                     app.execute_current();
+                }
+                KeyCode::Esc => {
+                    if app.is_in_neovim_menu {
+                        app.is_in_neovim_menu = false;
+                        app.output = String::from("Returned to main menu. Select an option.");
+                    }
                 }
                 _ => {}
             }
