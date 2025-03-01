@@ -129,7 +129,6 @@ impl App {
     }
     // TO DO
 
-    fn backup_state(&mut self) {}
 
     fn backup_cache(&mut self) {}
     fn is_command_exist(&mut self, cmd: &str, checker: Option<&str>) -> bool {
@@ -677,6 +676,19 @@ impl App {
             }
             Err(e) => {
                 self.output = format!("Failed to backup share directory: {}", e);
+            }
+        }
+    }
+    fn backup_state(&mut self) {
+        let home = self.get_home_directory();
+        let state_path = format!("{}/.local/state/nvim", home);
+        let target_path = format!("{}/.local/state/nvim.tar.gz", home);
+        match self.create_tar_gz(&state_path, &target_path) {
+            Ok(_) => {
+                self.output = String::from("State directory backed up successfully!");
+            }
+            Err(e) => {
+                self.output = format!("Failed to backup state directory: {}", e);
             }
         }
     }
