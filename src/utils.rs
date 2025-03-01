@@ -128,7 +128,6 @@ impl App {
         }
     }
     // TO DO
-    fn backup_share(&mut self) {}
 
     fn backup_state(&mut self) {}
 
@@ -667,5 +666,18 @@ impl App {
         add_files_to_tar(&mut tar, src_path, src_path)?;
         tar.finish()?;
         Ok(())
+    }
+    fn backup_share(&mut self) {
+        let home = self.get_home_directory();
+        let share_path = format!("{}/.local/share/nvim", home);
+        let target_path = format!("{}/.local/share/nvim.tar.gz", home);
+        match self.create_tar_gz(&share_path, &target_path) {
+            Ok(_) => {
+                self.output = String::from("Share directory backed up successfully!");
+            }
+            Err(e) => {
+                self.output = format!("Failed to backup share directory: {}", e);
+            }
+        }
     }
 }
