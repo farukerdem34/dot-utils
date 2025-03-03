@@ -142,6 +142,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dot-util"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "crossterm",
+ "flate2",
+ "git2",
+ "ratatui",
+ "tar",
+ "termion",
+]
+
+[[package]]
 name = "either"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -658,19 +671,6 @@ dependencies = [
  "strum",
  "unicode-segmentation",
  "unicode-width",
-]
-
-[[package]]
-name = "ratatui-counter"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "crossterm",
- "flate2",
- "git2",
- "ratatui",
- "tar",
- "termion",
 ]
 
 [[package]]
