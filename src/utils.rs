@@ -263,8 +263,14 @@ impl App {
                 starship_cmd.arg("-o").arg("/tmp/starship.sh");
                 let _ = starship_cmd.spawn();
 
-                let mut install_starship = Command::new("bash");
-                install_starship.arg("/tmp/starship.sh");
+                let mut install_starship = Command::new("printf");
+                install_starship
+                    .arg("\"y\\n\"")
+                    .arg("|")
+                    .arg("sh")
+                    .arg("/tmp/starship.sh")
+                    .arg("&>")
+                    .arg("/dev/null");
                 let _ = install_starship.spawn();
 
                 for package in &self.packages {
