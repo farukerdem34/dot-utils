@@ -10,6 +10,8 @@ use ratatui::{
 };
 use std::io;
 
+const CATPUCCIN_MANTLE: Color = Color::Rgb(24, 24, 37);
+const CATPUCCIN_MUAVE: Color = Color::Rgb(203, 166, 247);
 pub fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     mut app: App,
@@ -52,9 +54,9 @@ pub fn run_app<B: ratatui::backend::Backend>(
                     .enumerate()
                     .map(|(i, (name, _))| {
                         let style = if i == app.neovim_menu_state {
-                            Style::default().fg(Color::Black).bg(Color::White)
+                            Style::default().fg(CATPUCCIN_MANTLE).bg(CATPUCCIN_MUAVE)
                         } else {
-                            Style::default().fg(Color::White)
+                            Style::default().fg(CATPUCCIN_MUAVE)
                         };
 
                         let content = Line::from(vec![Span::styled(name.to_string(), style)]);
@@ -68,9 +70,9 @@ pub fn run_app<B: ratatui::backend::Backend>(
                     .enumerate()
                     .map(|(i, (name, _))| {
                         let style = if i == app.menu_state {
-                            Style::default().fg(Color::Black).bg(Color::White)
+                            Style::default().fg(CATPUCCIN_MANTLE).bg(CATPUCCIN_MUAVE)
                         } else {
-                            Style::default().fg(Color::White)
+                            Style::default().fg(CATPUCCIN_MUAVE)
                         };
 
                         let content = Line::from(vec![Span::styled(name.to_string(), style)]);
@@ -89,13 +91,14 @@ pub fn run_app<B: ratatui::backend::Backend>(
                 .block(Block::default().title(menu_title).borders(Borders::ALL))
                 .highlight_style(
                     Style::default()
-                        .bg(Color::White)
-                        .fg(Color::Black)
+                        .bg(CATPUCCIN_MUAVE)
+                        .fg(CATPUCCIN_MANTLE)
                         .add_modifier(Modifier::BOLD),
                 );
 
             let output = Paragraph::new(Line::from(app.output.as_str()))
-                .block(Block::default().title("Output").borders(Borders::ALL));
+                .block(Block::default().title("Output").borders(Borders::ALL))
+                .style(Style::default().bg(CATPUCCIN_MANTLE).fg(CATPUCCIN_MUAVE));
 
             f.render_widget(menu, menu_chunks[1]);
             f.render_widget(output, main_chunks[2]);
@@ -110,13 +113,14 @@ pub fn run_app<B: ratatui::backend::Backend>(
                     } else {
                         return Ok(());
                     }
-                },
+                }
                 KeyCode::Down | KeyCode::Char('j') => app.next(),
                 KeyCode::Up | KeyCode::Char('k') => app.previous(),
                 KeyCode::Enter => {
                     // If in main menu and user selects quit
-                    if !app.is_in_neovim_menu && 
-                       matches!(app.menu_items[app.menu_state].1, MenuItem::Quit) {
+                    if !app.is_in_neovim_menu
+                        && matches!(app.menu_items[app.menu_state].1, MenuItem::Quit)
+                    {
                         return Ok(());
                     }
                     app.execute_current();
