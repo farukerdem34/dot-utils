@@ -173,10 +173,8 @@ impl App {
             _ => panic!("No valid package manager avaliable!"),
         }
         match output {
-            Ok(_) => {
-                self.output = String::from("Packages updated successfully!");
-            }
-            Err(e) => self.output = String::from(format!("{}", e)),
+            Ok(output) => self.output = format!("{}", String::from_utf8_lossy(&output.stdout)),
+            Err(e) => self.output = format!("{}", e),
         }
     }
     fn get_home_directory(&mut self) -> String {
@@ -220,16 +218,14 @@ impl App {
             _ => panic!("No valid package manager avaliable!"),
         }
         match output {
-            Ok(_) => {
-                self.output = String::from("Packages upgraded successfully!");
-            }
-            Err(e) => self.output = String::from(format!("{}", e)),
+            Ok(output) => self.output = format!("{}", String::from_utf8_lossy(&output.stdout)),
+            Err(e) => self.output = format!("{}", e),
         }
     }
     fn install_packages(&mut self) {
         let package_manager = self.get_package_manager();
-
-        let _result = match package_manager.as_str() {
+        let output;
+        match package_manager.as_str() {
             "apt" => {
                 let mut command = Command::new("sudo");
                 command.arg("apt").arg("install").arg("-y").arg("-qq");
@@ -237,11 +233,7 @@ impl App {
                 for package in &self.packages {
                     command.arg(package);
                 }
-                let output = command.output();
-                match output {
-                    Ok(_) => self.output = String::from("Packages Installed!"),
-                    Err(e) => self.output = format!("{}", e),
-                }
+                output = command.output();
             }
             "yay" => {
                 let mut command = Command::new("yay");
@@ -254,8 +246,7 @@ impl App {
                 for aur_package in &self.aur_packages {
                     command.arg(aur_package);
                 }
-                let _ = command.output();
-                self.output = String::from("Packages Installed!");
+                output = command.output();
             }
             "pacman" => {
                 let mut command = Command::new("sudo");
@@ -267,11 +258,19 @@ impl App {
                 for aur_package in &self.aur_packages {
                     command.arg(aur_package);
                 }
-                let _ = command.output();
-                self.output = String::from("Packages Installed!");
+                output = command.output();
             }
-            _ => self.output = String::from("No valid package manager found!"),
+            _ => {
+                output = Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "No valid package manager found!",
+                ));
+            }
         };
+        match output {
+            Ok(output) => self.output = format!("{}", String::from_utf8_lossy(&output.stdout)),
+            Err(e) => self.output = format!("{}", e),
+        }
     }
     fn link_dot_files(&mut self) {
         if self.is_command_exist("stow", Some("--version")) {
@@ -305,7 +304,7 @@ impl App {
             }
             let output = cmd.output();
             match output {
-                Ok(_) => self.output = String::from("Packages stowed succesfully."),
+                Ok(output) => self.output = format!("{}", String::from_utf8_lossy(&output.stdout)),
                 Err(e) => self.output = format!("{}", e),
             }
         } else {
