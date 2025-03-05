@@ -98,7 +98,8 @@ pub fn run_app<B: ratatui::backend::Backend>(
 
             let output = Paragraph::new(Line::from(app.output.as_str()))
                 .block(Block::default().title("Output").borders(Borders::ALL))
-                .style(Style::default().bg(CATPUCCIN_MANTLE).fg(CATPUCCIN_MUAVE));
+                .style(Style::default().bg(CATPUCCIN_MANTLE).fg(CATPUCCIN_MUAVE))
+                .scroll(app.scroll);
 
             f.render_widget(menu, menu_chunks[1]);
             f.render_widget(output, main_chunks[2]);
