@@ -16,6 +16,7 @@ pub struct App {
     pub neovim_menu_items: Vec<(&'static str, NeoVimItem)>,
     pub neovim_menu_state: usize,
     pub is_in_neovim_menu: bool,
+    pub scroll: (u16, u16),
 }
 
 pub enum MenuItem {
@@ -54,17 +55,7 @@ impl App {
             ],
             output: String::from("Welcome! Select an option and press Enter to execute."),
             packages: vec![
-                "bash",
-                "btop",
-                "fastfetch",
-                "kitty",
-                "nvim",
-                "starship",
-                "tmux",
-                "vim",
-                "zsh",
-                "zoxide",
-                "stow",
+                "bash", "btop", "kitty", "neovim", "tmux", "vim", "zsh", "zoxide", "stow",
             ],
             aur_packages: vec!["bat", "fzf", "starship"],
             neovim_menu_items: vec![
@@ -75,6 +66,7 @@ impl App {
             ],
             neovim_menu_state: 0,
             is_in_neovim_menu: false,
+            scroll: (0, 0),
         }
     }
 
@@ -169,6 +161,7 @@ impl App {
                     .arg("apt")
                     .arg("update")
                     .arg("-y")
+                    .arg("-qq")
                     .output();
             }
             "yay" => {
@@ -177,15 +170,11 @@ impl App {
             "pacman" => {
                 output = Command::new("sudo").arg("pacman").arg("-Sy").output();
             }
-            _ => panic!("error occurred"),
+            _ => panic!("No valid package manager avaliable!"),
         }
-
         match output {
             Ok(_) => {
-                self.output = String::from(format!(
-                    "Packages updated successfully with {}!",
-                    package_manager
-                ));
+                self.output = String::from("Packages updated successfully!");
             }
             Err(e) => self.output = String::from(format!("{}", e)),
         }
@@ -212,41 +201,30 @@ impl App {
 
     fn upgrade_packages(&mut self) {
         let package_manager = self.get_package_manager();
+        let output;
         match package_manager.as_str() {
             "apt" => {
-                let output = Command::new("sudo")
+                output = Command::new("sudo")
                     .arg("apt")
                     .arg("upgrade")
+                    .arg("-qq")
                     .arg("-y")
                     .output();
-                match output {
-                    Ok(_) => {
-                        self.output = String::from("Packages upgraded successfully!");
-                    }
-                    Err(e) => self.output = String::from(format!("{}", e)),
-                }
             }
             "yay" => {
-                let output = Command::new("yay").arg("-Syu").output();
-                match output {
-                    Ok(_) => {
-                        self.output = String::from("Packages upgraded successfully!");
-                    }
-                    Err(e) => self.output = String::from(format!("{}", e)),
-                }
+                output = Command::new("yay").arg("-Syu").output();
             }
             "pacman" => {
-                let output = Command::new("sudo").arg("pacman").arg("-Syu").output();
-                match output {
-                    Ok(_) => {
-                        self.output = String::from("Packages upgraded successfully!");
-                    }
-                    Err(e) => self.output = String::from(format!("{}", e)),
-                }
+                output = Command::new("sudo").arg("pacman").arg("-Syu").output();
             }
-            _ => self.output = String::from("No valid package manager found!"),
+            _ => panic!("No valid package manager avaliable!"),
         }
-        self.output = String::from("Packages upgraded successfully!");
+        match output {
+            Ok(_) => {
+                self.output = String::from("Packages upgraded successfully!");
+            }
+            Err(e) => self.output = String::from(format!("{}", e)),
+        }
     }
     fn install_packages(&mut self) {
         let package_manager = self.get_package_manager();
@@ -254,31 +232,16 @@ impl App {
         let _result = match package_manager.as_str() {
             "apt" => {
                 let mut command = Command::new("sudo");
-                command.arg("apt").arg("install").arg("-y");
-
-                let mut starship_cmd = Command::new("curl");
-                starship_cmd
-                    .arg("-fsSL")
-                    .arg("https://starship.rs/install.sh");
-                starship_cmd.arg("-o").arg("/tmp/starship.sh");
-                let _ = starship_cmd.spawn();
-
-                let mut install_starship = Command::new("printf");
-                install_starship
-                    .arg("\"y\\n\"")
-                    .arg("|")
-                    .arg("sh")
-                    .arg("/tmp/starship.sh")
-                    .arg("&>")
-                    .arg("/dev/null");
-                let _ = install_starship.spawn();
+                command.arg("apt").arg("install").arg("-y").arg("-qq");
 
                 for package in &self.packages {
                     command.arg(package);
                 }
-
-                let _ = command.output();
-                self.output = String::from("Packages Installed!");
+                let output = command.output();
+                match output {
+                    Ok(_) => self.output = String::from("Packages Installed!"),
+                    Err(e) => self.output = format!("{}", e),
+                }
             }
             "yay" => {
                 let mut command = Command::new("yay");
@@ -304,7 +267,7 @@ impl App {
                 for aur_package in &self.aur_packages {
                     command.arg(aur_package);
                 }
-                let _ = command.spawn();
+                let _ = command.output();
                 self.output = String::from("Packages Installed!");
             }
             _ => self.output = String::from("No valid package manager found!"),
